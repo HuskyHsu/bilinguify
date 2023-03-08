@@ -1,0 +1,13 @@
+[book]
+name = animal_farm.epub
+
+[translation]
+language = Traditional Chinese
+
+[openai]
+api_key = <YOUR API KEY>
+[openai.payload]
+model = gpt-3.5-turbo
+[openai.payload.number]
+temperature = 0
+presence_penalty = -2
