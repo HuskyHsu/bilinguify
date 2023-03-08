@@ -38,7 +38,7 @@ class ChatGPT(BaseModel):
     def _get_header(self):
         return {"Authorization": f"Bearer {next(self.api_keys)}"}
 
-    def call_api(self, message):
+    def translate(self, message):
         data = {
             **self.base_payload,
             "messages": [
