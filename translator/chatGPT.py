@@ -1,4 +1,6 @@
 from configparser import ConfigParser
+from itertools import cycle
+from typing import Iterable
 
 import requests
 from pydantic import BaseModel
@@ -6,34 +8,35 @@ from pydantic import BaseModel
 
 class ChatGPT(BaseModel):
     url: str = "https://api.openai.com/v1/chat/completions"
-    headers: dict = {}
-    base_payload: dict = {}
     language: str
+    api_keys: Iterable[str]
+    base_payload: dict = {}
 
     @classmethod
-    def from_config(cls):
-        config = ConfigParser()
-        config.read("config.ini")
-
-        headers = {"Authorization": f"Bearer {config.get('openai', 'api_key')}"}
-        payload = cls._process_payload_config(config)
-        language = config.get("translation", "language", fallback="Traditional Chinese")
-
-        return cls(headers=headers, base_payload=payload, language=language)
-
-    @classmethod
-    def _process_payload_config(cls, config):
-        payload_items = config.items("openai.payload")
+    def _process_payload_config(self, config):
+        payload_items = dict(config.items("openai.payload"))
         number_items = (
-            config.items("openai.payload.number")
+            dict(config.items("openai.payload.number"))
             if "openai.payload.number" in config
-            else []
+            else {}
         )
-        number_items_converted = [
-            [config[0], float(config[1])] for config in number_items
-        ]
+        number_items_converted = {k: float(v) for k, v in number_items.items()}
 
-        return dict(payload_items + number_items_converted)
+        return {**payload_items, **number_items_converted}
+
+    def __init__(self, config_path: str):
+        config = ConfigParser()
+        config.read(config_path)
+        language = config.get("translation", "language", fallback="Traditional Chinese")
+        api_keys = cycle(config.get("openai", "api_key").split(","))
+        base_payload = self._process_payload_config(config)
+
+        super().__init__(
+            api_keys=api_keys, base_payload=base_payload, language=language
+        )
+
+    def _get_header(self):
+        return {"Authorization": f"Bearer {next(self.api_keys)}"}
 
     def call_api(self, message):
         data = {
@@ -41,17 +44,13 @@ class ChatGPT(BaseModel):
             "messages": [
                 {
                     "role": "system",
-                    "content": "I want you to act as an English translator. Please translate the following sentence into Traditional Chinese while keeping its original meaning in English as much as possible and return only translated content not include the origin text.",
+                    "content": f"I want you to act as an English translator. Please translate the following sentence into {self.language} while keeping its original meaning in English as much as possible and return only translated content not include the origin text.",
                 },
-                {
-                    "role": "user",
-                    "content": message,
-                },
+                {"role": "user", "content": message},
             ],
         }
-        response = requests.post(self.url, headers=self.headers, json=data)
-        response.raise_for_status()  # Raises an exception if the response status code is not ok (200)
+        response = requests.post(self.url, headers=self._get_header(), json=data)
+        response.raise_for_status()
         result = response.json()
 
-        # print(result)
         return result["choices"][0]["message"]["content"].strip()
