@@ -6,6 +6,9 @@ language = Traditional Chinese
 
 [openai]
 api_key = <YOUR API KEY>
+rate_limit = 20
+# default is 20 requests per minute for free tier (Chat completions)
+# https://platform.openai.com/docs/guides/rate-limits/overview
 [openai.payload]
 model = gpt-3.5-turbo
 [openai.payload.number]

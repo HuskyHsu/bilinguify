@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 class ChatGPT(BaseModel):
     url: str = "https://api.openai.com/v1/chat/completions"
-    language: str
+    system_prompt: str
     api_keys: Iterable[str]
     base_payload: dict = {}
 
@@ -31,15 +31,29 @@ class ChatGPT(BaseModel):
     def __init__(self, config_path: str):
         config = ConfigParser()
         config.read(config_path)
+
         language = config.get("translation", "language", fallback="Traditional Chinese")
+        system_prompt = f"""
+            I want you to act as a professional English translator.
+            Please translate the following sentence into {language} while keeping its original meaning in English as much as possible.
+            Make the translation readable and intelligible.
+            Be elegant and natural in your translation.
+            Do not translate any personal names.
+            Do not add any additional text to the translation.
+            Please only return the translated content and do not include the original text.
+        """.replace(
+            "  ", ""
+        ).strip()
+
         api_keys = cycle(config.get("openai", "api_key").split(","))
         rate_limit = 60.0 / int(config.getint("openai", "rate_limit", fallback="20"))
+
         base_payload = self._process_payload_config(config)
 
         super().__init__(
             api_keys=api_keys,
             base_payload=base_payload,
-            language=language,
+            system_prompt=system_prompt,
             rate_limit=rate_limit,
         )
 
@@ -61,7 +75,7 @@ class ChatGPT(BaseModel):
             "messages": [
                 {
                     "role": "system",
-                    "content": f"I want you to act as an English translator. Please translate the following sentence into {self.language} while keeping its original meaning in English as much as possible and return only translated content not include the origin text.",
+                    "content": self.system_prompt,
                 },
                 {"role": "user", "content": message},
             ],
