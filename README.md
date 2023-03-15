@@ -32,3 +32,13 @@ poetry install
 ```shell
 pip install -r requirements.txt
 ```
+
+## Work flow
+
+```mermaid
+graph TD;
+    A[讀取epub檔案]-->B(抓取文字);
+    B-->C(進行翻譯);
+    C-->D(輸出翻譯後的文字);
+    D-->E[建立新的epub檔案];
+```
