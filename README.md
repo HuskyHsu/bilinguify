@@ -35,10 +35,27 @@ pip install -r requirements.txt
 
 ## Work flow
 
+### main flow
+
 ```mermaid
-graph TD;
-    A[讀取epub檔案]-->B(抓取文字);
-    B-->C(進行翻譯);
-    C-->D(輸出翻譯後的文字);
-    D-->E[建立新的epub檔案];
+graph TB
+    A[Read EPUB file]-->B(Extract text);
+    B-->C(Translate);
+    C-->D(Output translated text);
+    D-->E[Create new EPUB file];
+```
+
+### translate flow
+
+```mermaid
+graph TB
+A(start)-->B(create api key/data/result queue)
+B-->D(get api key and item data for queue)
+D-->E(translate)
+E-->G(result add to result queue)
+G-->H(api key add to queue)
+H-->I{data queue is emtry?}
+I--no-->D
+I--yes-->J(cancel task)
+J-->K(end)
 ```
