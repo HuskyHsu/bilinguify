@@ -87,7 +87,15 @@ class OpenAI:
                 created, result = await self._call_chat_completions_api(
                     api_key, data.message
                 )
-                await self.result_queue.put(Result(data.id, result))
+                if created < 0:
+                    data.retry += 1
+                    if data.retry > 5:
+                        raise Exception(
+                            "Something went wrong and caused a single task to fail more than five times, so the program has been terminated."
+                        )
+                    await self.data_queue.put(data)
+                else:
+                    await self.result_queue.put(Result(data.id, result))
 
                 now = time.time()
                 if now < created + 3:
@@ -103,9 +111,9 @@ class OpenAI:
                 self.data_queue.task_done()
 
     async def a_translate(self, messages):
-        Message = namedtuple("Message", "id, message")
+        Message = namedtuple("Message", "id, message, retry")
         for i, data in enumerate(messages):
-            await self.data_queue.put(Message(i, data))
+            await self.data_queue.put(Message(i, data, 0))
 
         qsize = self.api_key_queue.qsize()
         tasks = [asyncio.create_task(self._fetch_data()) for _ in range(qsize)]
@@ -121,7 +129,7 @@ class OpenAI:
             result = await self.result_queue.get()
             results.append(result)
 
-        print("\n ===translate over===")
+        print("===translate over===")
         results.sort(key=lambda x: x.id)
         return [result.result for result in results]
 
