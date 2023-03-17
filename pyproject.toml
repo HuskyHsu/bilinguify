@@ -12,6 +12,9 @@ aiohttp = "^3.8.4"
 
 [tool.poetry.dev-dependencies]
 
+[tool.poetry.group.dev.dependencies]
+black = {version = "^23.1.0", allow-prereleases = true}
+
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
