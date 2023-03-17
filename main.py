@@ -1,7 +1,7 @@
-from translator import OpenAi
+from translator import OpenAI
 
 if __name__ == "__main__":
-    openai = OpenAi("config.ini")
+    openai = OpenAI("config.ini")
 
     input_data = [
         "Chat models take a series of messages as input, and return a model-generated message as output.",

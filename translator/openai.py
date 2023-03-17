@@ -7,24 +7,22 @@ import math
 import aiohttp
 
 
-class OpenAi:
+class OpenAI:
     url: str = "https://api.openai.com/v1"
 
     def __init__(self, config_path: str):
         config = ConfigParser()
         config.read(config_path)
 
-        api_keys = config.get("openai", "api_key").split(",")
-        api_key_queue = asyncio.Queue()
-
-        for key in api_keys:
-            api_key_queue.put_nowait(key)
-
         self.language = config.get(
             "translation", "language", fallback="Traditional Chinese"
         )
 
-        self.api_key_queue = api_key_queue
+        api_keys = config.get("openai", "api_key").split(",")
+        self.api_key_queue = asyncio.Queue()
+        for key in api_keys:
+            self.api_key_queue.put_nowait(key)
+
         self.data_queue = asyncio.Queue()
         self.result_queue = asyncio.Queue()
 
@@ -40,9 +38,7 @@ class OpenAi:
             if "openai.payload.number" in config
             else {}
         )
-        number_items_converted = {k: float(v) for k, v in number_items.items()}
-
-        return {**payload_items, **number_items_converted}
+        return {**payload_items, **{k: float(v) for k, v in number_items.items()}}
 
     async def _call_chat_completions_api(self, api_key, message):
         api_path = "/chat/completions"
@@ -68,10 +64,7 @@ class OpenAi:
                 json={
                     **base_config,
                     "messages": [
-                        {
-                            "role": "system",
-                            "content": system_prompt,
-                        },
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": message},
                     ],
                 },
@@ -114,10 +107,8 @@ class OpenAi:
         for i, data in enumerate(messages):
             await self.data_queue.put(Message(i, data))
 
-        tasks = []
         qsize = self.api_key_queue.qsize()
-        for _ in range(qsize):
-            tasks.append(asyncio.ensure_future(self._fetch_data()))
+        tasks = [asyncio.create_task(self._fetch_data()) for _ in range(qsize)]
 
         await self.data_queue.join()
 
@@ -131,7 +122,8 @@ class OpenAi:
             results.append(result)
 
         print("\n ===translate over===")
-        return [result.result for result in sorted(results, key=lambda x: x.id)]
+        results.sort(key=lambda x: x.id)
+        return [result.result for result in results]
 
     def translate(self, messages):
         return asyncio.run(self.a_translate(messages))
