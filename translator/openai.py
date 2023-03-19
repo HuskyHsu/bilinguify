@@ -1,5 +1,6 @@
 from collections import namedtuple
 from configparser import ConfigParser
+from contextlib import asynccontextmanager
 import asyncio
 import time
 import math
@@ -33,12 +34,17 @@ class OpenAI:
 
     def _get_chat_completions_config(self, config):
         payload_items = dict(config.items("openai.payload"))
-        number_items = (
-            dict(config.items("openai.payload.number"))
-            if "openai.payload.number" in config
-            else {}
-        )
-        return {**payload_items, **{k: float(v) for k, v in number_items.items()}}
+        number_items = dict(config.items("openai.payload.number")) or {}
+        number_items = {k: float(v) for k, v in number_items.items()}
+        return {**payload_items, **number_items}
+
+    @asynccontextmanager
+    async def _get_api_key(self):
+        api_key = await self.api_key_queue.get()
+        try:
+            yield api_key
+        finally:
+            await self.api_key_queue.put(api_key)
 
     async def _call_chat_completions_api(self, api_key, message):
         api_path = "/chat/completions"
@@ -78,37 +84,36 @@ class OpenAI:
                 )
 
     async def _fetch_data(self):
-        Result = namedtuple("Result", "id, result")
+        Result = namedtuple("Result", "id, result, error")
         while True:
-            api_key = await self.api_key_queue.get()
             data = await self.data_queue.get()
+            async with self._get_api_key() as api_key:
+                try:
+                    created, result = await self._call_chat_completions_api(
+                        api_key, data.message
+                    )
+                    if created < 0:
+                        data = data._replace(retry=data.retry + 1)
+                        print(result)
+                        if data.retry < 5:
+                            await self.data_queue.put(data)
+                        else:
+                            await self.result_queue.put(Result(data.id, None, result))
+                        await asyncio.sleep(3)
+                        raise Exception(result)
 
-            try:
-                created, result = await self._call_chat_completions_api(
-                    api_key, data.message
-                )
-                if created < 0:
-                    data.retry += 1
-                    if data.retry > 5:
-                        raise Exception(
-                            "Something went wrong and caused a single task to fail more than five times, so the program has been terminated."
-                        )
-                    await self.data_queue.put(data)
-                else:
-                    await self.result_queue.put(Result(data.id, result))
+                    await self.result_queue.put(Result(data.id, result, None))
 
-                now = time.time()
-                if now < created + 3:
-                    sleep_time = math.ceil(created + 3 - now)
-                    await asyncio.sleep(sleep_time)
+                    now = time.time()
+                    if now < created + 3:
+                        sleep_time = math.ceil(created + 3 - now)
+                        await asyncio.sleep(sleep_time)
 
-                await self.api_key_queue.put(api_key)
-
-                print(f"{data.message}\n>>> {result}\n")
-            except Exception as e:
-                print("error", e)
-            finally:
-                self.data_queue.task_done()
+                    print(f"{data.message}\n>>> {result}\n")
+                except Exception as e:
+                    print("error: ", e)
+                finally:
+                    self.data_queue.task_done()
 
     async def a_translate(self, messages):
         Message = namedtuple("Message", "id, message, retry")
@@ -131,7 +136,7 @@ class OpenAI:
 
         print("===translate over===")
         results.sort(key=lambda x: x.id)
-        return [result.result for result in results]
+        return results
 
     def translate(self, messages):
         return asyncio.run(self.a_translate(messages))

@@ -13,5 +13,8 @@ if __name__ == "__main__":
 
     results = openai.translate(input_data)
 
-    for i, result in enumerate(results):
-        print(f"{i + 1}. {result}")
+    for result in results:
+        if result.error is not None:
+            raise result.error
+
+        print(f"{result.id + 1}. {result.result}")
