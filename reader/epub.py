@@ -15,11 +15,10 @@ class EpubReader:
             if item.get_type() == ebooklib.ITEM_DOCUMENT:
                 soup = self._get_soup(item.get_content())
 
-                ls = soup.body.strings
-                for l in ls:
-                    l = l.strip()
-                    if len(l) == 0:
-                        continue
-                    print(f"\n{l}")
+                print(soup)
+
+                children = soup.body.findChildren()
+                for child in children:
+                    print(f"\n{child.text}")
 
                 yield soup
