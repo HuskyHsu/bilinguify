@@ -1,35 +1,6 @@
-import json
-
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
-
-
-def html_to_dict(element):
-    if element.name is None:
-        return None
-
-    if element.text.strip() == "":
-        return None
-
-    result = {
-        "tag": element.name,
-        "full_text": element.text.strip(),
-    }
-    if element.has_attr("class") and element["class"]:
-        result["class"] = element["class"]
-
-    if element.contents != None and len(element.contents) > 0:
-        result["children"] = [
-            html_to_dict(child) for child in element.contents if child != "\n"
-        ]
-        result["children"] = [
-            child for child in result["children"] if child is not None
-        ]
-        if len(result["children"]) == 0:
-            del result["children"]
-
-    return result
 
 
 class EpubReader:
@@ -39,15 +10,66 @@ class EpubReader:
     def _get_soup(self, content):
         return BeautifulSoup(content.decode("utf-8"), "html.parser")
 
+    def _html_to_dict(self, element):
+        tag = element.name
+        text = element.text.strip()
+
+        if not tag or not text:
+            return None
+
+        result = {
+            "tag": tag,
+            "full_text": text,
+        }
+        if element.has_attr("class") and element["class"]:
+            result["class"] = element["class"]
+
+        children = [
+            self._html_to_dict(child) for child in element.contents if child != "\n"
+        ]
+        children = [child for child in children if child is not None]
+        if children:
+            result["children"] = children
+
+        return result
+
+    def _get_paragraphs_level(self, results, level=0):
+        def get_level(result):
+            if result["tag"] == "p":
+                return level
+
+            if "children" not in result:
+                return 0
+
+            return self._get_paragraphs_level(result["children"], level + 1)
+
+        return max(get_level(result) for result in results)
+
+    def get_paragraphs(self, results, level):
+        for result in results:
+            if level == 0:
+                yield result["full_text"]
+
+            if "children" not in result:
+                continue
+
+            yield from self.get_paragraphs(result["children"], level - 1)
+
     def read(self):
         for item in self.book.get_items():
             if item.get_type() == ebooklib.ITEM_DOCUMENT:
                 soup = self._get_soup(item.get_content())
 
-                print(soup.body)
+                results = [
+                    children
+                    for children in [
+                        self._html_to_dict(content) for content in soup.body.contents
+                    ]
+                    if children is not None
+                ]
+                level = self._get_paragraphs_level(results)
 
-                result = html_to_dict(soup.body)
+                for paragraph in self.get_paragraphs(results, level):
+                    print(f"{paragraph}\n")
 
-                print(json.dumps(result))
-
-                yield soup
+                yield results, level

@@ -1,3 +1,5 @@
+import json
+
 from reader import epub
 
 
@@ -7,4 +9,5 @@ if __name__ == "__main__":
 
     for i in range(3):
         print("\n========\n")
-        chapter_content = next(chapter_contents)
+        chapter_content, level = next(chapter_contents)
+        print(json.dumps(chapter_content), level)
