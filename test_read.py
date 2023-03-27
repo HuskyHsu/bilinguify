@@ -1,13 +1,15 @@
-import json
-
 from reader import epub
 
 
 if __name__ == "__main__":
-    epub_reader = epub.EpubReader("input_book/animal_farm.epub")
-    chapter_contents = epub_reader.read()
+    epub_reader = epub.EpubReader("input_book/Alice's Adventures in Wonderland.epub")
 
-    for i in range(3):
+    i = 0
+    for paragraph in epub_reader.read():
         print("\n========\n")
-        chapter_content, level = next(chapter_contents)
-        print(json.dumps(chapter_content), level)
+        print(paragraph)
+        i += 1
+        # if i > 100:
+        #     break
+
+    print(i)

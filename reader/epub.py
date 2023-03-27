@@ -12,7 +12,7 @@ class EpubReader:
 
     def _html_to_dict(self, element):
         tag = element.name
-        text = element.text.strip()
+        text = element.text.strip().replace("\n", " ")
 
         if not tag or not text:
             return None
@@ -67,9 +67,10 @@ class EpubReader:
                     ]
                     if children is not None
                 ]
+                if not results:
+                    continue
+
                 level = self._get_paragraphs_level(results)
 
                 for paragraph in self.get_paragraphs(results, level):
-                    print(f"{paragraph}\n")
-
-                yield results, level
+                    yield paragraph
