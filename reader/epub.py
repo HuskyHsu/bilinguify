@@ -1,18 +1,24 @@
-import ebooklib
-from ebooklib import epub
+import re
+from configparser import ConfigParser
+
+from ebooklib import epub, ITEM_DOCUMENT
 from bs4 import BeautifulSoup
 
 
 class EpubReader:
-    def __init__(self, filepath):
-        self.book = epub.read_epub(filepath)
+    def __init__(self, config_path):
+        config = ConfigParser()
+        config.read(config_path)
+
+        file_path = config.get("book", "file_path")
+        self.book = epub.read_epub(file_path)
 
     def _get_soup(self, content):
         return BeautifulSoup(content.decode("utf-8"), "html.parser")
 
     def _html_to_dict(self, element):
         tag = element.name
-        text = element.text.strip().replace("\n", " ")
+        text = re.sub(rf"<\/?{tag}[^>]*>|^\s+|\s+$", "", str(element)).strip()
 
         if not tag or not text:
             return None
@@ -55,9 +61,13 @@ class EpubReader:
 
             yield from self.get_paragraphs(result["children"], level - 1)
 
-    def read(self):
+    def read(self, limit_part=None):
+        part = 0
         for item in self.book.get_items():
-            if item.get_type() == ebooklib.ITEM_DOCUMENT:
+            if limit_part and part >= limit_part:
+                break
+
+            if item.get_type() == ITEM_DOCUMENT:
                 soup = self._get_soup(item.get_content())
 
                 results = [
@@ -74,3 +84,5 @@ class EpubReader:
 
                 for paragraph in self.get_paragraphs(results, level):
                     yield paragraph
+
+            part += 1

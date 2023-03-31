@@ -1,5 +1,5 @@
 [book]
-name = animal_farm.epub
+file_path = input_book/Alice’s Adventures in Wonderland.epub
 
 [translation]
 language = Traditional Chinese
