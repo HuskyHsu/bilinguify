@@ -27,8 +27,9 @@ class EpubReader:
             "tag": tag,
             "full_text": text,
         }
-        if element.has_attr("class") and element["class"]:
-            result["class"] = element["class"]
+
+        if element.attrs.keys():
+            result["attrs"] = element.attrs
 
         children = [
             self._html_to_dict(child) for child in element.contents if child != "\n"
@@ -54,7 +55,7 @@ class EpubReader:
     def get_paragraphs(self, results, level):
         for result in results:
             if level == 0:
-                yield result["full_text"]
+                yield result
 
             if "children" not in result:
                 continue
